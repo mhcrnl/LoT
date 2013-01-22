@@ -8,7 +8,7 @@
 static battery _bat;
 static proc _cpu;
 static memory _mem;
-static system sys = {
+system sys = {
     .battery    = &_bat,
     .cpu        = &_cpu,
     .memory     = &_mem,
@@ -83,10 +83,18 @@ void update_battery() {
 }
 
 //Processor
-void _init_proc() {}
-void update_proc() {}
+void _init_proc() {
+    return;
+}
+void update_proc() {
+    return;
+}
 
 
 //Memory
-void update_memory() {}
-void _init_memory() {}
+void _init_memory() {
+    return;
+}
+void update_memory() {
+    return;
+}
