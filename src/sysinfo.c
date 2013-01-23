@@ -85,10 +85,11 @@ void _init_proc() {
     int i;
     struct stat st;
     //Check if cpufreq_stats is loaded
-    if ( !stat("/sys/module/cpufreq_stats", &st) != 0 )
-        _cpu._cpufreq_mod_loaded = 0;
-    else
+    stat("/sys/module/cpufreq_stats", &st);
+    if (S_ISDIR(st.st_mode))
         _cpu._cpufreq_mod_loaded = 1;
+    else
+        _cpu._cpufreq_mod_loaded = 0;
 
     //Initialize processes array to be 0's
     for (i = 0; i < 10; _cpu.processes[i++] = 0);
