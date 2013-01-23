@@ -1,7 +1,8 @@
 #include <stdio.h>
-#include <unistd.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <sysinfo.h>
 
@@ -43,6 +44,7 @@ void _init_battery() {
 }
 
 void update_battery() {
+    char status[32];
     if ( !_bat._bat_dir_present ) return;
 
     //Check if battery is present
@@ -69,8 +71,12 @@ void update_battery() {
 
     //Get status of battery
     fr = fopen("/sys/class/power_supply/BAT0/status", "rt");
-    fscanf(fr, "%d", &_bat.status);
+    fscanf(fr, "%s", status);
     fclose(fr);
+
+    if ( strcmp(status, "Charging" ) == 0 ) _bat.status = 1;
+    else if ( strcmp(status, "Discharging") == 0 ) _bat.status = 2;
+    else _bat.status = 0;
 
     //Get (dis)charge rate
     fr = fopen("/sys/class/power_supply/BAT0/power_now", "rt");
@@ -83,13 +89,14 @@ void update_battery() {
 //Processor
 void _init_proc() {
     int i;
+
+    //Assume the module is not loaded
+    _cpu._cpufreq_mod_loaded = 0;
     struct stat st;
     //Check if cpufreq_stats is loaded
     stat("/sys/module/cpufreq_stats", &st);
     if (S_ISDIR(st.st_mode))
         _cpu._cpufreq_mod_loaded = 1;
-    else
-        _cpu._cpufreq_mod_loaded = 0;
 
     //Initialize processes array to be 0's
     for (i = 0; i < 10; _cpu.processes[i++] = 0);
