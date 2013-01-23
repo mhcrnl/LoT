@@ -8,7 +8,7 @@
 static battery _bat;
 static proc _cpu;
 static memory _mem;
-system sys = {
+sysstat sys = {
     .battery    = &_bat,
     .cpu        = &_cpu,
     .memory     = &_mem,
@@ -16,7 +16,7 @@ system sys = {
 
 FILE *fr; //File Pointer
 
-void init_system() {
+void init_sysstat() {
 
     _init_battery();
     _init_proc();
@@ -27,11 +27,13 @@ void init_system() {
 
 //Battery
 void _init_battery() {
-    struct stat st;
 
-    if ( !stat("/sys/class/power_supply/BAT0",&st) == 0 ) {
-        _bat.bat_dir_present = false;
-        return;
+    _bat._bat_dir_present = 0; //Assume absent
+
+    struct stat st;
+    stat("/sys/class/power_supply/BAT0", &st);
+    if (S_ISDIR(st.st_mode)) {
+        _bat._bat_dir_present = 1;
     }
 
     //First update
@@ -41,18 +43,14 @@ void _init_battery() {
 }
 
 void update_battery() {
-    int tmp;
+    if ( !_bat._bat_dir_present ) return;
 
     //Check if battery is present
     fr = fopen("/sys/class/power_supply/BAT0/present", "rt");
-    fscanf(fr, "%d", &tmp);
+    fscanf(fr, "%d", &_bat.present);
     fclose(fr);
     //We rely on this being set for all other settings, so return early
-    //  if it is not set.
-    if (tmp == 0) {
-        _bat.present = false;
-        return;
-    }
+    if (!_bat.present) return;
 
     //Get total capacity NOTE: This is not the design capacity.
     fr = fopen("/sys/class/power_supply/BAT0/energy_full", "rt");
@@ -60,7 +58,7 @@ void update_battery() {
     fclose(fr);
 
     //Get design capacity
-    fr = fopen("/sys/class/power_supply/BAT0/energy_full", "rt");
+    fr = fopen("/sys/class/power_supply/BAT0/energy_full_design", "rt");
     fscanf(fr, "%d", &_bat.capacity_design);
     fclose(fr);
 
@@ -76,7 +74,7 @@ void update_battery() {
 
     //Get (dis)charge rate
     fr = fopen("/sys/class/power_supply/BAT0/power_now", "rt");
-    fscanf(fr, "%d", &_bat.status);
+    fscanf(fr, "%d", &_bat.rate);
     fclose(fr);
 
     return;
@@ -84,17 +82,96 @@ void update_battery() {
 
 //Processor
 void _init_proc() {
+    int i;
+    struct stat st;
+    //Check if cpufreq_stats is loaded
+    if ( !stat("/sys/module/cpufreq_stats", &st) != 0 )
+        _cpu._cpufreq_mod_loaded = 0;
+    else
+        _cpu._cpufreq_mod_loaded = 1;
+
+    //Initialize processes array to be 0's
+    for (i = 0; i < 10; _cpu.processes[i++] = 0);
+
+    update_proc();
+
     return;
 }
 void update_proc() {
+    int i;
+    int total = 0;
+    int idle = 0;
+
+    //We can only get frequency stats if cpufreq_stats is modprobed
+    if ( _cpu._cpufreq_mod_loaded ) {
+        //Max frequency
+        fr = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq", "rt");
+        fscanf(fr, "%d", &_cpu.freq_max);
+        fclose(fr);
+
+        //Current frequency
+        fr = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "rt");
+        fscanf(fr, "%d", &_cpu.freq);
+        fclose(fr);
+    }
+
+    //Get stuff from /proc/stat
+    fr = fopen("/proc/stat", "rt");
+    fscanf(fr, "%*s"); //Eats the first column containing cpu
+    //There are only 10 columns (max) for proc/stat cpu info
+    for ( i = 0; !feof(fr) && !ferror(fr) && i < 10; i++) {
+        fscanf(fr, "%d", &_cpu.processes[i]);
+        total += _cpu.processes[i];
+        if ( i == 3 || i == 4 )
+            idle += _cpu.processes[i];
+    }
+    fclose(fr);
+
+    i = total - _cpu.proc_total; //Use i as a temporary
+    _cpu.usage = (double)( i - (idle - _cpu.proc_idle)) / (double)(i);
+
+    //Store total and idle into proc_total and proc_idle for next update
+    _cpu.proc_total = total;
+    _cpu.proc_idle = idle;
+
     return;
 }
-
 
 //Memory
 void _init_memory() {
+    //There should not be anything holding us back from proc/meminfo
+    update_memory();
     return;
+
 }
 void update_memory() {
+    int i;
+    //Open up proc/meminfo, it is the only file needed for all mem stats
+    fr = fopen("/proc/meminfo", "rt");
+
+    //MemTotal
+    fscanf(fr, "%*s %d %*s", &_mem.total);
+
+    //MemFree
+    fscanf(fr, "%*s %d %*s", &_mem.free);
+
+    //Buffers
+    fscanf(fr, "%*s %d %*s", &_mem.buffers);
+
+    //Cached
+    fscanf(fr, "%*s %d %*s", &_mem.cached);
+
+    //Skip 9 lines to get to swap stats
+    for (i = 0; i < 9; fscanf(fr, "%*s %*d %*s"), i++);
+
+    //SwapTotal
+    fscanf(fr, "%*s %d %*s", &_mem.swap_total);
+
+    //SwapFree
+    fscanf(fr, "%*s %d %*s", &_mem.swap_free);
+
+    //Close /proc/meminfo
+    fclose(fr);
+
     return;
 }

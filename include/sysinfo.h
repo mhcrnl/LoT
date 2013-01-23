@@ -1,17 +1,14 @@
-#include <stdio.h>
-#include <stdbool.h>
-
 /* System Power information */
 typedef struct battery {
     //All found in /sys/class/power_supply/BAT0
-    bool    bat_dir_present;     // does /sys/class/power_supply/BAT0 exist
-    bool    present;            // present
+    int     _bat_dir_present;     // does /sys/class/power_supply/BAT0 exist
+    int     present;            // present
     int     capacity;           // energy_full
     int     capacity_design;    // energy_full_design
     int     remaining;          // energy_now
     int     status;             // status: 0 = Full, 1 = Charging,
                                 //   2 = Discharging
-    int     discharge_rate;     // power_now
+    int     rate;     // power_now
 } battery;
 
 /* System Load information */
@@ -19,25 +16,13 @@ typedef struct proc {
     /* /proc/cpuinfo - whatever useful stuff can be gained from there
        and cpu usage calculated from /proc/stat
     */
-    int     freq;               // current running frequency
+    int     _cpufreq_mod_loaded; //Requires cpufreq_stats to be modprobed before hand
     int     freq_max;
+    int     freq;               // current running frequency
     double  usage;              // usage percent in range 0 to 1
-    struct {
-        //Do I need this much info, not really, but why not. :)
-        int total;
-        int user;
-        int niced;
-        int system;
-        int idle;
-        int io;
-        int irq;
-        int softirq;
-        //These are used for guest operating systems (eg. xen)
-        int steal;
-        //These are virtual cpu under guest
-        int guest;
-        int guest_nice;
-    } pstat;                    // Struct with /proc/stat info
+    int     processes[10];      // Contains info from /proc/stat
+    int     proc_total;         // Sum of processes array
+    int     proc_idle;          // Sum of idle and io blocked procs
     //Look at adding array of usages for each core
 } proc;
 
@@ -47,21 +32,21 @@ typedef struct memory {
     int     total;
     int     free;
     int     buffers;
-    int     cache;
-    int     swap_total;
-    int     swap_free;
+    int     cached;
+    int     swap_total;         // I never use swap but I'm including it now
+    int     swap_free;          //  so I don't have to later
 } memory;
 
 /* Tie it all together */
-typedef struct system {
-    battery*     battery;
-    proc*   cpu;
-    memory*      memory;
-} system;
+typedef struct sysstat {
+    battery*    battery;
+    proc*       cpu;
+    memory*     memory;
+} sysstat;
 
 
 //Initilization functions
-void init_system();
+void init_sysstat();
 
 void _init_battery();
 void _init_proc();
