@@ -1,3 +1,13 @@
+#ifndef __SYSINFO_H__
+#define __SYSINFO_H__
+
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+
 /* System Power information */
 typedef struct battery {
     //All found in /sys/class/power_supply/BAT0
@@ -47,6 +57,7 @@ typedef struct sysstat {
 
 //Initilization functions
 void init_sysstat();
+void update_sysstat();
 
 void _init_battery();
 void _init_proc();
@@ -56,3 +67,5 @@ void _init_memory();
 void update_battery();
 void update_proc();
 void update_memory();
+
+#endif

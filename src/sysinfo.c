@@ -1,10 +1,4 @@
-#include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include <sysinfo.h>
+#include "sysinfo.h"
 
 static battery _bat;
 static proc _cpu;
@@ -24,6 +18,12 @@ void init_sysstat() {
     _init_memory();
 
     return;
+}
+
+void update_sysstat() {
+    update_battery();
+    update_proc();
+    update_memory();
 }
 
 //Battery
